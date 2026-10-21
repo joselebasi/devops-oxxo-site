@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Trebuchet MS", sans-serif;
+  --color-brand: #b51d32;
+  --color-ink: #242424;
+}
+
+@layer base {
+  body {
+    margin: 0;
+    min-width: 320px;
+    color: var(--color-ink);
+    background-color: #fafafa;
+    background-image: radial-gradient(#dedede 0.6px, transparent 0.6px);
+    background-size: 20px 20px;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 3px solid #087f6d;
+    outline-offset: 4px;
+  }
+}

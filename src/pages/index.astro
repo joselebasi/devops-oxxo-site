@@ -1,0 +1,23 @@
+---
+import Counter from '../components/Counter';
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="DevOps OXXO">
+  <div class="mx-auto flex min-h-svh max-w-5xl flex-col px-6 sm:px-10">
+    <header class="flex flex-wrap items-center justify-between gap-4 border-b border-neutral-300 py-7">
+      <a href="/" class="text-lg font-bold text-brand">DevOps OXXO</a>
+      <span class="inline-flex items-center gap-2 text-sm text-neutral-600">
+        <span class="size-2 rounded-full bg-emerald-700" aria-hidden="true"></span>
+        Entorno local
+      </span>
+    </header>
+    <main class="flex flex-1 flex-col justify-center gap-12 py-16 sm:py-24">
+      <h1 class="max-w-xl text-4xl leading-tight font-bold sm:text-5xl">DevOps OXXO</h1>
+      <Counter client:load initialValue={0} />
+    </main>
+    <footer class="border-t border-neutral-300 py-6 text-sm text-neutral-600">
+      DevOps OXXO
+    </footer>
+  </div>
+</Layout>
