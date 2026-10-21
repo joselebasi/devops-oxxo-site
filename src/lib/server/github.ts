@@ -21,7 +21,7 @@ const githubApiUrl = 'https://api.github.com';
 function formValue(args: string[], key: string): string | undefined {
   for (let index = 0; index < args.length - 1; index += 1) {
     if (args[index] === '-f' && args[index + 1]?.startsWith(`${key}=`)) {
-      return args[index + 1].slice(key.length + 1);
+      return args[index + 1]?.slice(key.length + 1);
     }
   }
   return undefined;
@@ -106,7 +106,9 @@ export function githubRunner(token: string, fetcher: typeof fetch = fetch): Gith
 
     const path = args[0];
     if (!path) throw new GithubError('BAD_REQUEST', 'La ruta de GitHub no es valida.');
-    let url = new URL(path.startsWith('/') ? path : `/${path}`, githubApiUrl).toString();
+    const requestUrl = new URL(path.startsWith('/') ? path : `/${path}`, githubApiUrl);
+    if (requestUrl.origin !== githubApiUrl) throw new GithubError('BAD_REQUEST', 'La ruta de GitHub no es valida.');
+    let url = requestUrl.toString();
     const pages: unknown[] = [];
     for (let page = 0; page < 1000; page += 1) {
       const response = await request(url);

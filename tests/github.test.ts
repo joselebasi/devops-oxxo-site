@@ -44,11 +44,10 @@ test('follows only GitHub REST pagination links', async () => {
     urls.push(String(input));
     assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer test-token');
     const firstPage = urls.length === 1;
-    const headers = firstPage
-      ? { link: '<https://api.github.com/orgs/org-one/repos?per_page=100&type=all&page=2>; rel="next"' }
-      : {};
+    const headers = new Headers({ 'content-type': 'application/json' });
+    if (firstPage) headers.set('link', '<https://api.github.com/orgs/org-one/repos?per_page=100&type=all&page=2>; rel="next"');
     const body = [{ name: firstPage ? 'infra-one' : 'infra-two', private: true, default_branch: 'main' }];
-    return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json', ...headers } });
+    return new Response(JSON.stringify(body), { headers });
   };
   const run = githubRunner('test-token', fetcher);
   const pages = await run(['orgs/org-one/repos?per_page=100&type=all', '--paginate', '--slurp']);
