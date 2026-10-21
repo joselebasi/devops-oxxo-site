@@ -53,19 +53,22 @@ El token de GitHub debe permitir consultar las organizaciones del enterprise y l
 
 Se integra `@clerk/astro` 4 con la aplicacion existente **OXXO DevHub** (`app_3L0NyubeIZcAsOGltSvW60Zmcd1`). No se crea una aplicacion accountless ni se reemplazan las claves que ya funcionan.
 
-- [src/middleware.ts](src/middleware.ts) conserva el bloqueo local y ejecuta `clerkMiddleware()`. Las peticiones sin sesion a `/_actions/*` reciben HTTP 401 antes de consultar GitHub o Terraform Cloud.
-- [src/pages/index.astro](src/pages/index.astro) requiere sesion y redirige a `/sign-in` cuando no la hay.
+- [src/middleware.ts](src/middleware.ts) conserva el bloqueo local y ejecuta `clerkMiddleware()`. Las Actions reciben HTTP 401 sin sesion o HTTP 403 sin una organizacion activa autorizada, antes de consultar GitHub o Terraform Cloud. Se comprueban las invocaciones RPC y las de formularios HTML.
+- [src/pages/index.astro](src/pages/index.astro) requiere sesion y redirige a `/sign-in` cuando no la hay. Sin organizacion activa autorizada no renderiza ni hidrata el explorador: muestra el contacto del administrador, `jose.toledano@axity.com`.
 - [src/pages/sign-in.astro](src/pages/sign-in.astro) y [src/pages/sign-up.astro](src/pages/sign-up.astro) son publicas para iniciar sesion y registrarse. Las sesiones existentes vuelven a `/`.
-- [src/layouts/Layout.astro](src/layouts/Layout.astro) muestra los controles de acceso/registro o el menu del usuario autenticado.
+- [src/layouts/Layout.astro](src/layouts/Layout.astro) muestra los controles de acceso/registro o el menu de usuario y `OrganizationSwitcher`. Seleccionar, crear o abandonar una organizacion vuelve a `/` para reevaluar los permisos en el servidor.
+- [src/lib/organization-access.ts](src/lib/organization-access.ts) permite los IDs de las organizaciones existentes Lider de Infraestructura y DevOps. Crear otra organizacion no concede acceso al explorador. Los IDs son propios de la instancia actual; deben revisarse al configurar produccion.
 - Las rutas y redirecciones locales estan configuradas en [astro.config.mjs](astro.config.mjs), sin depender de agregar manualmente mas variables al archivo privado.
 
 Las claves de desarrollo requeridas son `PUBLIC_CLERK_PUBLISHABLE_KEY` y `CLERK_SECRET_KEY`. Solo la primera es publica. No compartas ni agregues la segunda al codigo cliente. Las claves se administran con Clerk CLI; no vuelvas a ejecutar `init` en este proyecto ya integrado. Usa `npx -y clerk@latest doctor` para diagnosticarlo. Para restaurar claves faltantes de esta misma aplicacion se utiliza `npx -y clerk@latest env pull`, sin reemplazar claves validas.
 
 Se instalaron globalmente para GitHub Copilot las skills oficiales `clerk`, `clerk-setup`, `clerk-cli`, `clerk-astro-patterns` y `clerk-testing`.
 
-Para comprobar una sesion completa, abre `/sign-in` y accede con un usuario autorizado de la aplicacion, o registrate segun su politica. Debe aparecer el menu de usuario y el explorador. Las pruebas de instalacion no crean usuarios ni modifican proveedores sociales de esta aplicacion existente.
+La instancia de desarrollo mantiene Organizations habilitado y `force_organization_selection: false` (membresia opcional durante el inicio de sesion). Asi Clerk no obliga a crear una organizacion en el paso "Setup your organization". Esto permite completar el acceso, pero no autoriza el explorador. Las sesiones que estaban pendientes pueden necesitar cerrar sesion e iniciar de nuevo.
 
-Esta integracion usa la instancia de desarrollo. Clerk autentica al usuario, pero no asigna autorizacion individual sobre los tokens compartidos de GitHub o Terraform Cloud. Se mantiene la restriccion de acceso local. Antes de publicar deben definirse usuarios autorizados, roles y permisos, politica de registro y configuracion de produccion. No se habilitan Organizations ni SSO automaticamente.
+Un administrador debe asignar membresia en Lider de Infraestructura o DevOps y el usuario debe seleccionar esa organizacion en el encabezado. Antes de ello solo aparece el mensaje de asignacion pendiente. El selector conserva las operaciones de gestion e invitacion que Clerk autorice segun el rol. No se crean organizaciones ni se asignan membresias automaticamente.
+
+Ambas organizaciones habilitan el mismo explorador; sus IDs no son organizaciones GitHub ni workspaces Terraform. Los permisos de los tokens compartidos de GitHub y Terraform Cloud no se separan por miembro. Se mantiene la restriccion de acceso local. Antes de publicar deben definirse roles y permisos por operacion, politica de registro y configuracion de produccion. No se habilita SSO automaticamente.
 
 ## Flujo
 

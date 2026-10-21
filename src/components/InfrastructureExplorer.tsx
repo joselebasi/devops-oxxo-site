@@ -155,7 +155,7 @@ export default function InfrastructureExplorer({ enterprise }: Props) {
       </div>
       {error && <div role="alert" className="mb-5 border-l-4 border-brand bg-red-50 px-4 py-3 text-sm text-red-900">{error}</div>}
 
-      <section className="min-w-0 py-3" aria-labelledby="preview-title">
+      {result && <section className="min-w-0 py-3" aria-labelledby="preview-title">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <h2 id="preview-title" className="inline-flex items-center gap-2 text-lg font-semibold"><FileCode2 size={20} aria-hidden="true" />Variables</h2>
           {result && <span className="inline-flex max-w-full items-center gap-2 text-xs text-neutral-500"><GitBranch size={14} aria-hidden="true" /><span className="truncate" title={result.commit}>{result.commit.slice(0, 12)}</span></span>}
@@ -169,8 +169,8 @@ export default function InfrastructureExplorer({ enterprise }: Props) {
           destinationError={result.destinationError}
           filename={`${repository}-${files.find((file) => file.path === path)?.environment ?? 'variables'}`}
           onSubmitting={(submitting) => setPending(submitting ? 'Creando variables en Terraform Cloud' : null)}
-        /> : <div className="flex min-h-60 items-center justify-center border-t border-neutral-200 px-5 py-12 text-center text-sm text-neutral-500">{result ? 'Sin variables declaradas' : 'Sin archivo seleccionado'}</div>}
-      </section>
+        /> : <div className="border-t border-neutral-200 px-5 py-8 text-center text-sm text-neutral-500">Sin variables declaradas</div>}
+      </section>}
     </div>
   );
 }

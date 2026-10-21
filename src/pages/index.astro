@@ -12,8 +12,7 @@ const enterprise = authorized ? getSecret('GITHUB_ENTERPRISE')?.trim() || 'oxxog
 ---
 
 <Layout title="Variables IaC | DevOps OXXO" description="Consulta local de variables de infraestructura del enterprise oxxogh.">
-  <div class="mx-auto flex min-h-svh max-w-7xl flex-col px-5 sm:px-10">
-    <main class="min-w-0 flex-1 py-9">
+    <main class="mx-auto w-full min-w-0 max-w-7xl px-5 py-9 sm:px-10">
       {authorized ? <InfrastructureExplorer client:load enterprise={enterprise} /> : (
         <div role="status" class="border-l-4 border-amber-600 bg-amber-50 px-5 py-6 text-amber-950">
           <h1 class="text-xl font-semibold">Asignacion de organizacion pendiente</h1>
@@ -22,8 +21,4 @@ const enterprise = authorized ? getSecret('GITHUB_ENTERPRISE')?.trim() || 'oxxog
         </div>
       )}
     </main>
-    <footer class="border-t border-neutral-300 py-6 text-sm text-neutral-600">
-      DevOps OXXO
-    </footer>
-  </div>
 </Layout>

@@ -1,5 +1,7 @@
 ---
 import '../styles/global.css';
+import { Image } from 'astro:assets';
+import engineeringLogo from '../assets/logo-ingenieria-staff.png';
 import { OrganizationSwitcher, Show, SignInButton, SignUpButton, UserButton } from '@clerk/astro/components';
 
 interface Props {
@@ -23,9 +25,33 @@ const {
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
   </head>
-  <body class="font-sans antialiased">
-    <header class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 border-b border-neutral-300 px-5 py-7 sm:px-10">
-      <a href="/" class="text-lg font-bold text-brand">DevOps OXXO</a>
+  <body class="grid min-h-dvh grid-rows-[auto_1fr_auto] font-sans antialiased">
+    <header class="w-full border-t-4 border-t-brand border-b border-b-neutral-300 bg-white">
+      <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-6 sm:px-10">
+      <a href="/" aria-label="Inicio de DevOps OXXO" class="inline-flex max-w-full items-center gap-3 text-lg font-bold text-brand">
+        <Image
+          src={engineeringLogo}
+          alt="Ingenieria Staff OXXO"
+          width={96}
+          widths={[96, 192]}
+          sizes="(min-width: 640px) 96px, 80px"
+          format="webp"
+          quality={85}
+          loading="eager"
+          decoding="async"
+          fetchpriority="high"
+          class="h-[52.8px] w-auto shrink-0 sm:h-[63.36px]"
+        />
+        <span aria-hidden="true" class="h-10 w-px shrink-0 bg-neutral-400 sm:h-12"></span>
+        <img
+          src="/logocolor.png"
+          alt="Axity"
+          width="96"
+          height="36"
+          class="h-[38.72px] w-auto shrink-0 sm:h-[46.464px]"
+          decoding="async"
+        />
+      </a>
       <div class="flex flex-wrap items-center gap-5">
         <span class="inline-flex items-center gap-2 text-sm text-neutral-600">
           <span class="size-2 rounded-full bg-emerald-700" aria-hidden="true"></span>
@@ -51,7 +77,14 @@ const {
           </Show>
         </nav>
       </div>
+      </div>
     </header>
     <slot />
+    <footer class="w-full border-t border-neutral-300 bg-white">
+      <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-5 text-sm text-neutral-600 sm:px-10">
+        <span class="font-semibold text-ink">DevOps OXXO</span>
+        <span>Infraestructura y DevOps</span>
+      </div>
+    </footer>
   </body>
 </html>
