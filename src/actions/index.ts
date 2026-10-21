@@ -14,7 +14,7 @@ const branchInput = repoInput.extend({ branch });
 function client() {
   const token = getSecret('GH_TOKEN')?.trim();
   const enterprise = getSecret('GITHUB_ENTERPRISE')?.trim() || 'oxxogh';
-  if (!token) throw new ActionError({ code: 'PRECONDITION_FAILED', message: 'Falta GH_TOKEN en .env. Configuralo en el servidor y reinicia Astro.' });
+  if (!token) throw new ActionError({ code: 'PRECONDITION_FAILED', message: 'Falta GH_TOKEN en las variables de entorno del servidor.' });
   if (!/^[a-zA-Z0-9-]+$/.test(enterprise)) throw new ActionError({ code: 'PRECONDITION_FAILED', message: 'GITHUB_ENTERPRISE debe contener el slug del enterprise.' });
   return createGithubClient(enterprise, githubRunner(token));
 }
@@ -31,7 +31,7 @@ async function query<Result>(operation: (github: ReturnType<typeof client>) => P
 
 async function terraformQuery<Result>(operation: (terraform: ReturnType<typeof createTerraformCloudClient>) => Promise<Result>): Promise<Result> {
   const token = getSecret('TERRAFORM_CLOUD_TOKEN')?.trim();
-  if (!token) throw new ActionError({ code: 'PRECONDITION_FAILED', message: 'Falta TERRAFORM_CLOUD_TOKEN en el entorno del servidor. Configuralo y reinicia Astro.' });
+  if (!token) throw new ActionError({ code: 'PRECONDITION_FAILED', message: 'Falta TERRAFORM_CLOUD_TOKEN en las variables de entorno del servidor.' });
   try {
     return await operation(createTerraformCloudClient(token));
   } catch (error) {

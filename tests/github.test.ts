@@ -1,11 +1,79 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createGithubClient, GithubError } from '../src/lib/server/github.ts';
+import { createGithubClient, GithubError, githubRunner } from '../src/lib/server/github.ts';
 import type { GithubRunner } from '../src/lib/server/github.ts';
 import { variablePaths } from '../src/lib/contracts.ts';
 
 const enterprisePage = (login: string) => ({ data: { enterprise: { organizations: { nodes: [{ login, name: login }] } } } });
 const commit = 'a'.repeat(40);
+
+test('paginates enterprise GraphQL requests with server-side token auth', async () => {
+  const cursors: (string | null)[] = [];
+  const fetcher: typeof fetch = async (input, init) => {
+    assert.equal(String(input), 'https://api.github.com/graphql');
+    assert.equal(init?.method, 'POST');
+    assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer test-token');
+    const payload = JSON.parse(String(init?.body)) as { variables: { endCursor: string | null } };
+    cursors.push(payload.variables.endCursor);
+    const hasNextPage = cursors.length === 1;
+    const body = {
+      data: {
+        enterprise: {
+          organizations: {
+            nodes: [{ login: `org-${cursors.length}`, name: `org-${cursors.length}` }],
+            pageInfo: { hasNextPage, endCursor: hasNextPage ? 'cursor-1' : null },
+          },
+        },
+      },
+    };
+    return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
+  };
+  const run = githubRunner('test-token', fetcher);
+  const pages = await run([
+    'graphql', '--paginate', '--slurp', '-f', 'query=query($enterprise: String!, $endCursor: String) { enterprise { organizations { nodes { login name } pageInfo { hasNextPage endCursor } } } }',
+    '-f', 'enterprise=oxxogh',
+  ]) as { data: { enterprise: { organizations: { nodes: { login: string }[] } } } }[];
+
+  assert.deepEqual(cursors, [null, 'cursor-1']);
+  assert.deepEqual(pages.map((page) => page.data.enterprise.organizations.nodes[0]?.login), ['org-1', 'org-2']);
+});
+
+test('follows only GitHub REST pagination links', async () => {
+  const urls: string[] = [];
+  const fetcher: typeof fetch = async (input, init) => {
+    urls.push(String(input));
+    assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer test-token');
+    const firstPage = urls.length === 1;
+    const headers = firstPage
+      ? { link: '<https://api.github.com/orgs/org-one/repos?per_page=100&type=all&page=2>; rel="next"' }
+      : {};
+    const body = [{ name: firstPage ? 'infra-one' : 'infra-two', private: true, default_branch: 'main' }];
+    return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json', ...headers } });
+  };
+  const run = githubRunner('test-token', fetcher);
+  const pages = await run(['orgs/org-one/repos?per_page=100&type=all', '--paginate', '--slurp']);
+
+  assert.equal(urls.length, 2);
+  assert.deepEqual(pages, [
+    [{ name: 'infra-one', private: true, default_branch: 'main' }],
+    [{ name: 'infra-two', private: true, default_branch: 'main' }],
+  ]);
+});
+
+test('rejects pagination links outside GitHub before forwarding the token', async () => {
+  let requests = 0;
+  const fetcher: typeof fetch = async () => {
+    requests += 1;
+    return new Response('[]', {
+      headers: { link: '<https://attacker.example/collect>; rel="next"' },
+    });
+  };
+  const run = githubRunner('test-token', fetcher);
+
+  await assert.rejects(run(['orgs/org-one/repos?per_page=100', '--paginate']), (error: unknown) =>
+    error instanceof GithubError && error.code === 'BAD_GATEWAY');
+  assert.equal(requests, 1);
+});
 
 test('combines enterprise and repository pages before applying the name filter', async () => {
   const run: GithubRunner = async (args) => {

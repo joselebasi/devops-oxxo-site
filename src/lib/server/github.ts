@@ -1,12 +1,9 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { posix } from 'node:path';
 import { z } from 'astro/zod';
 import { variablePaths } from '../contracts.ts';
 import type { Repository, VariableFile, VariablePath, VariableResult } from '../contracts.ts';
 import { isInfrastructureRepository, parseCloudWorkspace, parseVariables } from './terraform.ts';
 
-const executeFile = promisify(execFile);
 type ErrorCode = 'NOT_FOUND' | 'FORBIDDEN' | 'BAD_GATEWAY' | 'BAD_REQUEST' | 'TIMEOUT';
 export class GithubError extends Error {
   readonly code: ErrorCode;
@@ -19,34 +16,106 @@ export class GithubError extends Error {
 
 export type GithubRunner = (args: string[]) => Promise<unknown>;
 
-export function githubRunner(token: string): GithubRunner {
+const githubApiUrl = 'https://api.github.com';
+
+function formValue(args: string[], key: string): string | undefined {
+  for (let index = 0; index < args.length - 1; index += 1) {
+    if (args[index] === '-f' && args[index + 1]?.startsWith(`${key}=`)) {
+      return args[index + 1].slice(key.length + 1);
+    }
+  }
+  return undefined;
+}
+
+function nextPageUrl(link: string | null): string | null {
+  const next = link?.split(',').map((part) => part.match(/<([^>]+)>;\s*rel="next"/))
+    .find((match) => match)?.[1];
+  if (!next) return null;
+  const url = new URL(next);
+  if (url.origin !== githubApiUrl) throw new GithubError('BAD_GATEWAY', 'GitHub devolvio un enlace de paginacion no valido.');
+  return url.toString();
+}
+
+export function githubRunner(token: string, fetcher: typeof fetch = fetch): GithubRunner {
   return async (args) => {
-    let stdout: string;
-    try {
-      ({ stdout } = await executeFile('gh', ['api', '--hostname', 'github.com', ...args], {
-        env: { ...process.env, GH_TOKEN: token, GH_HOST: 'github.com', GH_PROMPT_DISABLED: '1', GH_DEBUG: '' },
-        timeout: 60_000,
-        maxBuffer: 16 * 1024 * 1024,
-        windowsHide: true,
-        encoding: 'utf8',
-      }));
-    } catch (error) {
-      const failure = error as NodeJS.ErrnoException & { stderr?: string; killed?: boolean };
-      if (failure.code === 'ENOENT') {
-        throw new GithubError('BAD_GATEWAY', 'GitHub CLI (gh) no esta instalado o no esta en PATH.');
+    const isGraphql = args[0] === 'graphql';
+    const paginate = args.includes('--paginate');
+
+    async function request(url: string, body?: unknown): Promise<{ data: unknown; link: string | null }> {
+      let response: Response;
+      try {
+        response = await fetcher(url, {
+          method: body === undefined ? 'GET' : 'POST',
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'User-Agent': 'devops-oxxo-portal',
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+          body: body === undefined ? undefined : JSON.stringify(body),
+          signal: AbortSignal.timeout(60_000),
+          redirect: 'error',
+        });
+      } catch (error) {
+        if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+          throw new GithubError('TIMEOUT', 'GitHub no respondio a tiempo. Reintenta la consulta.');
+        }
+        throw new GithubError('BAD_GATEWAY', 'No se pudo consultar GitHub. Revisa conectividad, permisos y limites de API.');
       }
-      if (failure.killed) throw new GithubError('TIMEOUT', 'GitHub no respondio a tiempo. Reintenta la consulta.');
-      if (/HTTP 404/i.test(failure.stderr ?? '')) throw new GithubError('NOT_FOUND', 'El recurso no existe o el token no tiene acceso.');
-      if (/HTTP 401|HTTP 403|read:enterprise|SAML|SSO/i.test(failure.stderr ?? '')) {
+
+      if (response.status === 404) {
+        await response.body?.cancel();
+        throw new GithubError('NOT_FOUND', 'El recurso no existe o el token no tiene acceso.');
+      }
+      if (response.status === 401 || response.status === 403) {
+        await response.body?.cancel();
         throw new GithubError('FORBIDDEN', 'Revisa los permisos del token, su autorizacion SSO y el acceso al enterprise.');
       }
-      throw new GithubError('BAD_GATEWAY', 'No se pudo consultar GitHub. Revisa conectividad, permisos y limites de API.');
+      if (!response.ok) {
+        await response.body?.cancel();
+        throw new GithubError('BAD_GATEWAY', 'GitHub no pudo completar la consulta. Revisa conectividad y limites de API.');
+      }
+      try {
+        return { data: await response.json() as unknown, link: response.headers.get('link') };
+      } catch {
+        throw new GithubError('BAD_GATEWAY', 'GitHub devolvio una respuesta no valida.');
+      }
     }
-    try {
-      return JSON.parse(stdout) as unknown;
-    } catch {
-      throw new GithubError('BAD_GATEWAY', 'GitHub devolvio una respuesta no valida.');
+
+    if (isGraphql) {
+      const query = formValue(args, 'query');
+      const enterprise = formValue(args, 'enterprise');
+      if (!query || !enterprise) throw new GithubError('BAD_REQUEST', 'La consulta de GitHub no es valida.');
+
+      const pages: unknown[] = [];
+      let endCursor: string | null = null;
+      for (let page = 0; page < 1000; page += 1) {
+        const { data } = await request(`${githubApiUrl}/graphql`, { query, variables: { enterprise, endCursor } });
+        pages.push(data);
+        const pageInfo = (data as { data?: { enterprise?: { organizations?: { pageInfo?: { hasNextPage?: boolean; endCursor?: string | null } } | null } } })
+          ?.data?.enterprise?.organizations?.pageInfo;
+        if (!paginate || !pageInfo?.hasNextPage) return pages;
+        if (!pageInfo.endCursor || pageInfo.endCursor === endCursor) {
+          throw new GithubError('BAD_GATEWAY', 'No se pudo completar la paginacion de GitHub.');
+        }
+        endCursor = pageInfo.endCursor;
+      }
+      throw new GithubError('BAD_GATEWAY', 'La paginacion de GitHub excedio el limite permitido.');
     }
+
+    const path = args[0];
+    if (!path) throw new GithubError('BAD_REQUEST', 'La ruta de GitHub no es valida.');
+    let url = new URL(path.startsWith('/') ? path : `/${path}`, githubApiUrl).toString();
+    const pages: unknown[] = [];
+    for (let page = 0; page < 1000; page += 1) {
+      const response = await request(url);
+      pages.push(response.data);
+      const next = paginate ? nextPageUrl(response.link) : null;
+      if (!next) return paginate ? pages : response.data;
+      url = next;
+    }
+    throw new GithubError('BAD_GATEWAY', 'La paginacion de GitHub excedio el limite permitido.');
   };
 }
 

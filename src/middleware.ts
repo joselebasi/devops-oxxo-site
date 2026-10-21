@@ -3,13 +3,7 @@ import { clerkMiddleware } from '@clerk/astro/server';
 import { getActionContext } from 'astro:actions';
 import { hasInfrastructureAccess } from './lib/organization-access';
 
-const localOnly = defineMiddleware(async (context, next) => {
-  const loopbacks = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
-  const hosts = new Set(['localhost', '127.0.0.1', '[::1]']);
-  if (!hosts.has(context.url.hostname) || !loopbacks.has(context.clientAddress)
-    || context.request.headers.has('x-forwarded-for') || context.request.headers.has('forwarded')) {
-    return new Response('Esta herramienta solo permite acceso local directo.', { status: 403 });
-  }
+const securityHeaders = defineMiddleware(async (_context, next) => {
   const response = await next();
   response.headers.set('Cache-Control', 'no-store');
   response.headers.set('X-Content-Type-Options', 'nosniff');
@@ -37,4 +31,4 @@ const protectActions = defineMiddleware((context, next) => {
   return next();
 });
 
-export const onRequest = sequence(localOnly, clerkMiddleware(), protectActions);
+export const onRequest = sequence(securityHeaders, clerkMiddleware(), protectActions);
