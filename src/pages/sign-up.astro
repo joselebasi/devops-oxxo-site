@@ -1,0 +1,12 @@
+---
+import { SignUp } from '@clerk/astro/components';
+import Layout from '../layouts/Layout.astro';
+
+if (Astro.locals.auth().userId) return Astro.redirect('/');
+---
+
+<Layout title="Registrarse | DevOps OXXO">
+  <main class="flex min-h-[calc(100svh-100px)] items-center justify-center px-4 py-10">
+    <SignUp routing="hash" signInUrl="/sign-in" fallbackRedirectUrl="/" />
+  </main>
+</Layout>

@@ -12,8 +12,6 @@
     min-width: 320px;
     color: var(--color-ink);
     background-color: #fafafa;
-    background-image: radial-gradient(#dedede 0.6px, transparent 0.6px);
-    background-size: 20px 20px;
   }
 
   button {

@@ -1,20 +1,26 @@
 ---
-import Counter from '../components/Counter';
+import { getSecret } from 'astro:env/server';
+import InfrastructureExplorer from '../components/InfrastructureExplorer';
 import Layout from '../layouts/Layout.astro';
+import { hasInfrastructureAccess } from '../lib/organization-access';
+
+const auth = Astro.locals.auth();
+if (!auth.userId) return Astro.redirect('/sign-in');
+
+const authorized = hasInfrastructureAccess(auth);
+const enterprise = authorized ? getSecret('GITHUB_ENTERPRISE')?.trim() || 'oxxogh' : '';
 ---
 
-<Layout title="DevOps OXXO">
-  <div class="mx-auto flex min-h-svh max-w-5xl flex-col px-6 sm:px-10">
-    <header class="flex flex-wrap items-center justify-between gap-4 border-b border-neutral-300 py-7">
-      <a href="/" class="text-lg font-bold text-brand">DevOps OXXO</a>
-      <span class="inline-flex items-center gap-2 text-sm text-neutral-600">
-        <span class="size-2 rounded-full bg-emerald-700" aria-hidden="true"></span>
-        Entorno local
-      </span>
-    </header>
-    <main class="flex flex-1 flex-col justify-center gap-12 py-16 sm:py-24">
-      <h1 class="max-w-xl text-4xl leading-tight font-bold sm:text-5xl">DevOps OXXO</h1>
-      <Counter client:load initialValue={0} />
+<Layout title="Variables IaC | DevOps OXXO" description="Consulta local de variables de infraestructura del enterprise oxxogh.">
+  <div class="mx-auto flex min-h-svh max-w-7xl flex-col px-5 sm:px-10">
+    <main class="min-w-0 flex-1 py-9">
+      {authorized ? <InfrastructureExplorer client:load enterprise={enterprise} /> : (
+        <div role="status" class="border-l-4 border-amber-600 bg-amber-50 px-5 py-6 text-amber-950">
+          <h1 class="text-xl font-semibold">Asignacion de organizacion pendiente</h1>
+          <p class="mt-3 text-sm leading-6">Contacta al administrador para la asignacion de tu organizacion.</p>
+          <a href="mailto:jose.toledano@axity.com" class="mt-2 inline-block break-all text-sm font-semibold underline underline-offset-4">jose.toledano@axity.com</a>
+        </div>
+      )}
     </main>
     <footer class="border-t border-neutral-300 py-6 text-sm text-neutral-600">
       DevOps OXXO

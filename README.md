@@ -1,11 +1,13 @@
 # DevOps OXXO
 
-Base de desarrollo con Astro, islas React, Tailwind CSS y TypeScript estricto.
+Explorador local de repositorios IaC y variables Terraform con Astro Actions, GitHub CLI, React, Tailwind CSS y TypeScript estricto.
 
 ## Requisitos
 
 - Node.js >= 22.22.0; se recomienda Node.js 24 LTS.
 - pnpm 11.9.0, declarado en `packageManager`.
+- GitHub CLI (`gh`) instalado y disponible en PATH.
+- Una sesion de usuario en Clerk para acceder al explorador y sus Actions.
 
 ## Comandos
 
@@ -14,6 +16,7 @@ Base de desarrollo con Astro, islas React, Tailwind CSS y TypeScript estricto.
 | `pnpm install --frozen-lockfile` | Instalar las dependencias del lockfile |
 | `pnpm dev` | Iniciar el servidor de desarrollo |
 | `pnpm check` | Comprobar Astro y TypeScript |
+| `pnpm test` | Probar conversion HCL, formatos, paginacion y autorizacion con datos sinteticos |
 | `pnpm build` | Ejecutar los chequeos y generar el sitio en `dist/` |
 | `pnpm preview` | Previsualizar la compilacion local |
 
@@ -21,11 +24,94 @@ Base de desarrollo con Astro, islas React, Tailwind CSS y TypeScript estricto.
 
 - [src/pages/index.astro](src/pages/index.astro): pagina inicial renderizada por Astro.
 - [src/layouts/Layout.astro](src/layouts/Layout.astro): documento HTML y carga de estilos globales.
-- [src/components/Counter.tsx](src/components/Counter.tsx): isla React con `client:load` desde la pagina; los botones permiten comprobar su hidratacion.
+- [src/components/InfrastructureExplorer.tsx](src/components/InfrastructureExplorer.tsx): combos encadenados para elegir el origen como isla `client:load`.
+- [src/components/VariableEditor.tsx](src/components/VariableEditor.tsx): formulario de variables, descargas, destino y confirmacion de creacion.
+- [src/actions/index.ts](src/actions/index.ts): Actions validadas para consultar GitHub y crear variables en Terraform Cloud.
+- [src/lib/server/github.ts](src/lib/server/github.ts): consultas paginadas mediante `gh api`, con timeout y errores sanitizados.
+- [src/lib/server/terraform.ts](src/lib/server/terraform.ts): extraccion estructurada con `hcl2-parser`.
+- [src/lib/server/terraform-cloud.ts](src/lib/server/terraform-cloud.ts): consultas paginadas de destinos, permisos y creacion individual de variables.
 - [src/styles/global.css](src/styles/global.css): Tailwind v4 y estilos base.
 - [.github/FRONTEND-COPILOT.md](.github/FRONTEND-COPILOT.md): agentes, skills e instrucciones existentes, conservados sin cambios.
 
-Astro mantiene el contenido estatico; solo el contador se hidrata en el navegador. No se utiliza un adaptador SSR ni una API porque esta base genera un sitio estatico.
+## Configuracion Privada
+
+Completa `.env` directamente en tu editor, sin compartir los tokens en el chat:
+
+```dotenv
+GH_TOKEN=
+GITHUB_ENTERPRISE=oxxogh
+TERRAFORM_CLOUD_TOKEN=
+```
+
+`.env` esta ignorado por Git. [.env.example](.env.example) solo contiene nombres y valores vacios. Reinicia Astro despues de completar los tokens. No uses prefijos `PUBLIC_` para secretos.
+
+El token de GitHub debe permitir consultar las organizaciones del enterprise y leer sus repositorios y contenidos. En un PAT clasico esto normalmente requiere `read:enterprise`, `read:org` y `repo` para repositorios privados, sujeto a las politicas de la empresa y autorizacion SAML SSO. La consulta GraphQL del enterprise puede no estar disponible para tokens de grano fino o cuentas sin los permisos necesarios. Solo se muestran recursos accesibles para el token; no se puede enumerar contenido al que no tiene acceso. `oxxogh` se interpreta como slug de GitHub Enterprise Cloud en github.com, no como una instancia GitHub Enterprise Server.
+
+`gh` recibe el token por el entorno del proceso; nunca por argumentos ni por el navegador. No se utiliza `gh auth login` ni se modifica su configuracion persistente. `TERRAFORM_CLOUD_TOKEN` se utiliza solo en el servidor para consultar https://app.terraform.io y crear variables. El token debe permitir listar los destinos y leer/escribir variables en el workspace seleccionado. La organizacion de GitHub y la de Terraform Cloud son independientes.
+
+## Autenticacion Clerk
+
+Se integra `@clerk/astro` 4 con la aplicacion existente **OXXO DevHub** (`app_3L0NyubeIZcAsOGltSvW60Zmcd1`). No se crea una aplicacion accountless ni se reemplazan las claves que ya funcionan.
+
+- [src/middleware.ts](src/middleware.ts) conserva el bloqueo local y ejecuta `clerkMiddleware()`. Las peticiones sin sesion a `/_actions/*` reciben HTTP 401 antes de consultar GitHub o Terraform Cloud.
+- [src/pages/index.astro](src/pages/index.astro) requiere sesion y redirige a `/sign-in` cuando no la hay.
+- [src/pages/sign-in.astro](src/pages/sign-in.astro) y [src/pages/sign-up.astro](src/pages/sign-up.astro) son publicas para iniciar sesion y registrarse. Las sesiones existentes vuelven a `/`.
+- [src/layouts/Layout.astro](src/layouts/Layout.astro) muestra los controles de acceso/registro o el menu del usuario autenticado.
+- Las rutas y redirecciones locales estan configuradas en [astro.config.mjs](astro.config.mjs), sin depender de agregar manualmente mas variables al archivo privado.
+
+Las claves de desarrollo requeridas son `PUBLIC_CLERK_PUBLISHABLE_KEY` y `CLERK_SECRET_KEY`. Solo la primera es publica. No compartas ni agregues la segunda al codigo cliente. Las claves se administran con Clerk CLI; no vuelvas a ejecutar `init` en este proyecto ya integrado. Usa `npx -y clerk@latest doctor` para diagnosticarlo. Para restaurar claves faltantes de esta misma aplicacion se utiliza `npx -y clerk@latest env pull`, sin reemplazar claves validas.
+
+Se instalaron globalmente para GitHub Copilot las skills oficiales `clerk`, `clerk-setup`, `clerk-cli`, `clerk-astro-patterns` y `clerk-testing`.
+
+Para comprobar una sesion completa, abre `/sign-in` y accede con un usuario autorizado de la aplicacion, o registrate segun su politica. Debe aparecer el menu de usuario y el explorador. Las pruebas de instalacion no crean usuarios ni modifican proveedores sociales de esta aplicacion existente.
+
+Esta integracion usa la instancia de desarrollo. Clerk autentica al usuario, pero no asigna autorizacion individual sobre los tokens compartidos de GitHub o Terraform Cloud. Se mantiene la restriccion de acceso local. Antes de publicar deben definirse usuarios autorizados, roles y permisos, politica de registro y configuracion de produccion. No se habilitan Organizations ni SSO automaticamente.
+
+## Flujo
+
+1. Consultar las organizaciones del enterprise.
+2. Elegir una organizacion para listar todos sus repositorios accesibles y filtrar nombres que contengan `iac`, `infra` o `tf`, sin distinguir mayusculas.
+3. Elegir repositorio y rama. Se consulta cada pagina de resultados de GitHub.
+4. Elegir uno de los archivos existentes en estas rutas exactas, respetando el nombre `Infraestructure` y las mayusculas:
+
+```text
+Infraestructure/Provisioning/Develop/variables.tf
+Infraestructure/Provisioning/Staging/variables.tf
+Infraestructure/Provisioning/Production/variables.tf
+```
+
+5. Capturar los valores en el formulario. Cada variable permite editar clave, valor, descripcion, categoria, HCL y sensibilidad, o excluirla del envio. No se muestra el codigo del archivo. Se muestra el SHA de la lectura para identificar su origen.
+6. Consultar el destino literal del `providers.tf` que esta junto al archivo de variables, en el mismo commit. Se permite cambiar el destino manualmente, con una advertencia si difiere del archivo. No se infiere un workspace a partir del nombre de la rama.
+7. Las variables existentes comienzan en Conservar. Elegir Actualizar o Eliminar para modificarlas. La casilla Seleccionar todas las variables incluye todas las filas disponibles, incluso las ocultas por la busqueda; las existentes en Conservar pasan a Actualizar. No se vuelven a seleccionar filas ya procesadas.
+8. Revisar el resumen y confirmar explicitamente el destino y los cambios. Eliminar requiere una confirmacion adicional. Las respuestas de escritura muestran el resultado individual y nunca devuelven los valores enviados.
+
+Los valores predeterminados del repositorio no se devuelven ni se muestran, incluso en variables sensibles. Se conservan las descripciones y `sensitive = true`; sin esa marca se utiliza `false`. Los valores existentes de Terraform Cloud se muestran y precargan solo cuando no son sensibles. El servidor excluye el campo value de las variables sensibles; para actualizarlas hay que capturar un valor nuevo. Las variables nuevas empiezan vacias. HCL invalido, definiciones duplicadas y metadatos no literales producen un error. El limite de lectura es 1 MiB.
+
+La [API de variables de Terraform Cloud](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/workspace-variables) recibe un `POST /workspaces/:workspace_id/vars` por variable, con `data.type: "vars"` y los seis campos en `data.attributes`. `value` es el texto capturado, no `null`. Para listas u objetos se debe capturar una expresion HCL y marcar HCL; esta opcion no aplica a la categoria de entorno. Los valores vacios se rechazan para evitar creaciones accidentales. El lote permite hasta 100 variables y 1 MiB en UTF-8.
+
+Las descargas YAML/JSON se conservan sin previsualizacion de codigo. Incluyen las variables seleccionadas y las procesadas, con los valores del formulario. Los valores sensibles se omiten por defecto; incluirlos requiere activar una casilla explicita. No se guardan valores en localStorage. Tras un resultado creado/existente se limpia el valor sensible en memoria y se bloquea esa fila para evitar reenviarla.
+
+Antes de escribir se valida que el workspace pertenece a la organizacion seleccionada y que el token tiene lectura y escritura de variables. Crear no sobrescribe una clave existente: hay que elegir Actualizar para enviar PATCH, o Eliminar para enviar DELETE. Se comprueban el ID, identidad y version conocida de la variable antes de modificarla. Conservar no genera escrituras. No se crean workspaces ni se ejecutan planes o applies.
+
+La API no es transaccional para lotes: ante un error se conservan los resultados previos y no se envian las variables restantes. Un fallo de red tras un POST se marca como resultado no confirmado. Antes de reintentar debe revisarse el workspace; cada nuevo intento consulta otra vez las claves existentes. La misma solicitud se deduplica durante 30 minutos en memoria y solo se permite una creacion simultanea por token/workspace en este proceso. Estos controles no son un registro distribuido persistente.
+
+## Validacion Manual
+
+Se uso `xpos-evolucion/Oxxo.Cloud.Tf.QRPayment`, rama `hotfix-PTI26012-QR-payment`, archivo `Infraestructure/Provisioning/Staging/variables.tf`: se leyeron 22 variables reales y el destino `QRPayment-QA` de su providers.tf. Se verificaron la precarga de los valores no sensibles y la seleccion global con y sin busqueda. Las pruebas de escritura usan respuestas simuladas; no modifican destinos reales.
+
+## Ejecucion y Seguridad
+
+Astro utiliza el adaptador Node en modo standalone y renderizado de servidor para ejecutar las Actions. Para desarrollo: `pnpm dev`. Si ya existe una instancia: `pnpm exec astro dev stop` antes de iniciar otra.
+
+La aplicacion solo permite conexiones locales directas con hostname localhost/loopback y exige sesion Clerk para el explorador y las Actions. Se rechazan conexiones remotas y encabezados de proxy; las respuestas no se almacenan en cache. No se debe publicar ni exponer mediante tuneles con un token compartido. Un despliegue multiusuario requiere autorizacion por usuario y gestion de secretos antes de habilitar acceso remoto.
+
+Despues de `pnpm build`, inicia el servidor local compilado con Node y las variables de entorno cargadas:
+
+```bash
+HOST=127.0.0.1 node --env-file=.env dist/server/entry.mjs
+```
+
+El comando anterior usa sintaxis de Git Bash. La compilacion no necesita tokens. Las pruebas automatizadas usan datos sinteticos y no consultan GitHub ni Terraform Cloud.
 
 ## Compatibilidad
 

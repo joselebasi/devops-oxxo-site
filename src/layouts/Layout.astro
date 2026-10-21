@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import { OrganizationSwitcher, Show, SignInButton, SignUpButton, UserButton } from '@clerk/astro/components';
 
 interface Props {
   title: string;
@@ -23,6 +24,34 @@ const {
     <title>{title}</title>
   </head>
   <body class="font-sans antialiased">
+    <header class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 border-b border-neutral-300 px-5 py-7 sm:px-10">
+      <a href="/" class="text-lg font-bold text-brand">DevOps OXXO</a>
+      <div class="flex flex-wrap items-center gap-5">
+        <span class="inline-flex items-center gap-2 text-sm text-neutral-600">
+          <span class="size-2 rounded-full bg-emerald-700" aria-hidden="true"></span>
+          Entorno local
+        </span>
+        <nav aria-label="Cuenta" class="flex min-w-0 flex-wrap items-center gap-3">
+          <Show when="signed-out">
+            <SignInButton asChild mode="modal">
+              <button type="button" class="min-h-11 rounded-md border border-neutral-300 bg-white px-4 text-sm font-semibold hover:bg-neutral-100">Iniciar sesion</button>
+            </SignInButton>
+            <SignUpButton asChild mode="modal">
+              <button type="button" class="min-h-11 rounded-md bg-brand px-4 text-sm font-semibold text-white hover:brightness-90">Registrarse</button>
+            </SignUpButton>
+          </Show>
+          <Show when="signed-in">
+            <OrganizationSwitcher
+              hidePersonal
+              afterSelectOrganizationUrl="/"
+              afterCreateOrganizationUrl="/"
+              afterLeaveOrganizationUrl="/"
+            />
+            <UserButton />
+          </Show>
+        </nav>
+      </div>
+    </header>
     <slot />
   </body>
 </html>
