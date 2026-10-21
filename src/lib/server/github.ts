@@ -108,6 +108,8 @@ export function githubRunner(token: string, fetcher: typeof fetch = fetch): Gith
     if (!path) throw new GithubError('BAD_REQUEST', 'La ruta de GitHub no es valida.');
     const requestUrl = new URL(path.startsWith('/') ? path : `/${path}`, githubApiUrl);
     if (requestUrl.origin !== githubApiUrl) throw new GithubError('BAD_REQUEST', 'La ruta de GitHub no es valida.');
+    const ref = formValue(args, 'ref');
+    if (ref !== undefined) requestUrl.searchParams.set('ref', ref);
     let url = requestUrl.toString();
     const pages: unknown[] = [];
     for (let page = 0; page < 1000; page += 1) {
