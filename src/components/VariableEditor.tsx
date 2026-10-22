@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { actions } from 'astro:actions';
-import { ArrowUpRight, Check, Download, LoaderCircle, LockKeyhole, RefreshCw, Search, X } from 'lucide-react';
+import { ArrowUpRight, Check, Download, ExternalLink, LoaderCircle, LockKeyhole, RefreshCw, Search, X } from 'lucide-react';
 import type { ExistingVariable, TerraformVariable, TerraformWorkspace, VariableCreationResult, VariableInput, VariableOperation, VariableResult, WorkspaceSnapshot } from '../lib/contracts';
 import { formatVariables } from '../lib/variable-format';
 
@@ -346,6 +346,7 @@ export default function VariableEditor({ variables, filename, onSubmitting, dest
               {destination && organization && workspace && (organization !== destination.organization || workspace.name !== destination.workspaceName) && <p className="border-l-4 border-amber-600 bg-amber-50 p-3 text-sm text-amber-950">El destino manual difiere de providers.tf.</p>}
               <button type="button" onClick={() => void loadOrganizations()} disabled={busy !== null} className="text-sm font-semibold text-brand underline underline-offset-4 disabled:opacity-50">Cambiar destino</button>
               {workspace && <p className="break-all font-mono text-xs text-neutral-500">{workspace.id}</p>}
+              {workspace && organization && <a href={`https://app.terraform.io/app/${encodeURIComponent(organization)}/workspaces/${encodeURIComponent(workspace.name)}/variables`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 break-all text-sm font-semibold text-brand underline underline-offset-4">TF | WS | {workspace.name} | Variables<ExternalLink size={15} className="shrink-0" aria-hidden="true" /><span className="sr-only">(se abre en una pestana nueva)</span></a>}
               <div className="flex items-center justify-between border-y border-neutral-200 py-4 text-sm"><span>Variables seleccionadas</span><strong>{selected.length} / {drafts.length}</strong></div>
               <button type="submit" className={`${primary} w-full`} disabled={busy !== null || !selected.length || !workspace?.canWrite || !snapshotReady}><ArrowUpRight size={17} aria-hidden="true" />Revisar cambios</button>
               {(busy || notice) && <p role="status" className="flex items-center gap-2 text-sm text-neutral-600">{busy && <LoaderCircle size={16} className="shrink-0 animate-spin motion-reduce:animate-none" aria-hidden="true" />}{busy ?? notice}</p>}
