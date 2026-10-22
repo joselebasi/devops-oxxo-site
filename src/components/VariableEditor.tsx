@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { actions } from 'astro:actions';
 import { ArrowUpRight, Check, Download, LoaderCircle, LockKeyhole, RefreshCw, Search, X } from 'lucide-react';
 import type { ExistingVariable, TerraformVariable, TerraformWorkspace, VariableCreationResult, VariableInput, VariableOperation, VariableResult, WorkspaceSnapshot } from '../lib/contracts';
@@ -39,7 +40,7 @@ function reconcileDrafts(drafts: Draft[], remote: ExistingVariable[]): Draft[] {
     const existing = remote.find((variable) => identity(variable) === identity(draft));
     return { ...draft, existing, locked: false, operation: existing ? 'keep' : 'create',
       value: existing ? existing.sensitive ? '' : existing.value ?? '' : draft.value,
-      included: existing ? false : draft.operation === 'keep' || draft.locked ? true : draft.included,
+      included: existing || draft.existing || draft.locked ? false : draft.included,
       sensitive: draft.sensitive || Boolean(existing?.sensitive), hcl: existing?.hcl ?? draft.hcl };
   });
 }
@@ -55,7 +56,7 @@ function operationFor(draft: Draft): VariableOperation {
 
 export default function VariableEditor({ variables, filename, onSubmitting, destination, destinationError }: Props) {
   const [drafts, setDrafts] = useState<Draft[]>(() => variables.map((variable) => ({
-    ...variable, value: '', originalKey: variable.key, included: true, locked: false, operation: 'create',
+    ...variable, value: '', originalKey: variable.key, included: false, locked: false, operation: 'create',
   })));
   const [organizations, setOrganizations] = useState<string[]>([]);
   const [workspaces, setWorkspaces] = useState<TerraformWorkspace[]>([]);
@@ -72,24 +73,39 @@ export default function VariableEditor({ variables, filename, onSubmitting, dest
   const [exportSecrets, setExportSecrets] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
+  const [tab, setTab] = useState<'file' | 'workspace'>('file');
   const dialog = useRef<HTMLDialogElement>(null);
   const requestId = useRef<string | null>(null);
   const submitting = useRef(false);
   const selectAll = useRef<HTMLInputElement>(null);
   const selected = drafts.filter((draft) => draft.included && !draft.locked && draft.operation !== 'keep');
-  const selectable = drafts.filter((draft) => !draft.locked);
+  const inTab = (draft: Draft) => !snapshotReady || (tab === 'workspace') === (Boolean(draft.existing) || draft.locked);
+  const tabDrafts = drafts.filter(inTab);
+  const fileCount = drafts.filter((draft) => !draft.existing && !draft.locked).length;
+  const workspaceCount = drafts.length - fileCount;
+  const matches = (draft: Draft) => !search || draft.key.toLowerCase().includes(search.toLowerCase());
+  const selectable = tabDrafts.filter((draft) => !draft.locked);
+  const tabSelected = selected.filter(inTab);
   const allSelected = selectable.length > 0 && selectable.every((draft) => draft.included && draft.operation !== 'keep');
   const deletions = selected.filter((draft) => draft.operation === 'delete').length;
   const workspace = workspaces.find((item) => item.id === workspaceId);
 
   useEffect(() => {
-    if (selectAll.current) selectAll.current.indeterminate = selected.length > 0 && !allSelected;
-  }, [selected.length, allSelected]);
+    if (selectAll.current) selectAll.current.indeterminate = tabSelected.length > 0 && !allSelected;
+  }, [tabSelected.length, allSelected]);
+
+  function onTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return;
+    event.preventDefault();
+    const next = event.key === 'Home' || event.key === 'ArrowLeft' ? 'file' : 'workspace';
+    setTab(next);
+    document.getElementById(`tab-${next}`)?.focus();
+  }
 
   function toggleAll(checked: boolean) {
     requestId.current = null;
     setError('');
-    setDrafts((current) => current.map((draft) => draft.locked ? draft : {
+    setDrafts((current) => current.map((draft) => draft.locked || !inTab(draft) ? draft : {
       ...draft,
       included: checked,
       operation: checked ? draft.operation === 'keep' ? 'update' : draft.operation : draft.existing ? 'keep' : 'create',
@@ -143,7 +159,7 @@ export default function VariableEditor({ variables, filename, onSubmitting, dest
     setNotice('');
     setSnapshotReady(false); setRemoteVariables([]);
     setDrafts((current) => current.map((draft) => ({ ...draft, value: draft.sensitive ? '' : draft.value,
-      existing: undefined, locked: false, operation: 'create', included: true })));
+      existing: undefined, locked: false, operation: 'create', included: false })));
   }
 
   async function query<Result>(label: string, operation: () => Promise<{ data?: Result; error?: { message: string } }>, receive: (data: Result) => void) {
@@ -259,26 +275,43 @@ export default function VariableEditor({ variables, filename, onSubmitting, dest
           {drafts.some((draft) => draft.sensitive) && <label className="flex basis-full items-center gap-2 text-xs text-neutral-600"><input type="checkbox" checked={exportSecrets} onChange={(event) => setExportSecrets(event.target.checked)} className="size-4 accent-brand" />Incluir valores sensibles en la descarga</label>}
         </div>
 
+        {snapshotReady && <div className="mb-4">
+          <div role="tablist" aria-label="Origen de las variables" className="flex gap-1 border-b border-neutral-200">
+            {([['file', 'Solo en archivo', fileCount], ['workspace', 'En workspace', workspaceCount]] as const).map(([id, label, count]) => (
+              <button key={id} type="button" role="tab" id={`tab-${id}`} aria-selected={tab === id} aria-controls="variables-panel" tabIndex={tab === id ? 0 : -1}
+                onClick={() => setTab(id)} onKeyDown={onTabKeyDown}
+                className={`-mb-px inline-flex min-h-11 items-center gap-2 border-b-2 px-4 text-sm font-semibold ${tab === id ? 'border-brand text-brand' : 'border-transparent text-neutral-600 hover:text-ink'}`}>
+                {label}<span className={`rounded-full px-2 py-0.5 text-xs ${tab === id ? 'bg-red-50' : 'bg-neutral-100'}`}>{count}</span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-sm text-neutral-600">{tab === 'file'
+            ? 'Declaradas en variables.tf; aun no existen en el workspace.'
+            : `Ya existen en ${workspace?.name ?? 'el workspace'}. Elige conservar, actualizar o eliminar.`}</p>
+        </div>}
+
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 pb-4">
           <label htmlFor="select-all-variables" className="inline-flex items-center gap-3 text-sm font-semibold">
             <input ref={selectAll} id="select-all-variables" type="checkbox" checked={allSelected}
               disabled={busy !== null || !selectable.length || (snapshotReady && !workspace?.canWrite)}
               onChange={(event) => toggleAll(event.target.checked)} className="size-4 accent-brand" />
-            Seleccionar todas las variables
+            Seleccionar todas las variables{snapshotReady ? ` (${selectable.length})` : ''}
           </label>
-          <span className="text-xs text-neutral-500">{selected.length} de {drafts.length} seleccionadas</span>
+          <span className="text-xs text-neutral-500">{tabSelected.length} de {tabDrafts.length} seleccionadas</span>
         </div>
 
         <div className="grid min-w-0 gap-9 xl:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="min-w-0">
+          <div className="min-w-0" {...(snapshotReady ? { role: 'tabpanel', id: 'variables-panel', 'aria-labelledby': `tab-${tab}` } : {})}>
             {drafts.map((draft, index) => {
-              if (search && !draft.key.toLowerCase().includes(search.toLowerCase())) return null;
+              if (!inTab(draft) || !matches(draft)) return null;
               const outcome = outcomes.find((item) => item.key === draft.key && item.category === draft.category);
-              return <section key={draft.originalKey} className="min-w-0 border-b border-neutral-200 py-6 first:pt-0" data-variable={draft.originalKey}>
-                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                  <label htmlFor={`include-${index}`} className="inline-flex min-w-0 items-center gap-3 font-semibold"><input id={`include-${index}`} type="checkbox" checked={draft.included} disabled={busy !== null || draft.locked || (snapshotReady && !workspace?.canWrite)} onChange={(event) => edit(index, { included: event.target.checked, operation: event.target.checked ? draft.existing ? 'update' : 'create' : draft.existing ? 'keep' : 'create' })} className="size-4 shrink-0 accent-brand" /><span className="break-all font-mono text-sm">{draft.originalKey}</span></label>
-                  {outcome ? <span className={`inline-flex items-center gap-1 text-xs font-semibold ${draft.locked ? 'text-emerald-800' : 'text-red-800'}`}>{draft.locked && <Check size={14} aria-hidden="true" />}{statuses[outcome.status]}</span> : draft.sensitive && <span className="inline-flex items-center gap-1 text-xs text-neutral-500"><LockKeyhole size={14} aria-hidden="true" />Sensible</span>}
+              const showDetails = draft.locked || draft.included;
+              return <section key={draft.originalKey} className={`min-w-0 border-b border-neutral-200 first:pt-0 ${showDetails ? 'py-6' : 'py-1'}`} data-variable={draft.originalKey}>
+                <div className={`flex flex-wrap items-center justify-between gap-3 ${showDetails ? 'mb-5' : ''}`}>
+                  <label htmlFor={`include-${index}`} className="inline-flex min-h-11 min-w-0 items-center gap-3 font-semibold"><input id={`include-${index}`} type="checkbox" checked={draft.included} aria-controls={`variable-details-${index}`} disabled={busy !== null || draft.locked || (snapshotReady && !workspace?.canWrite)} onChange={(event) => edit(index, { included: event.target.checked, operation: event.target.checked ? draft.existing ? 'update' : 'create' : draft.existing ? 'keep' : 'create' })} className="size-4 shrink-0 accent-brand" /><span className="break-all font-mono text-sm">{draft.originalKey}</span></label>
+                  {outcome ? <span className={`inline-flex items-center gap-1 text-xs font-semibold ${draft.locked ? 'text-emerald-800' : 'text-red-800'}`}>{draft.locked && <Check size={14} aria-hidden="true" />}{statuses[outcome.status]}</span> : showDetails && draft.sensitive && <span className="inline-flex items-center gap-1 text-xs text-neutral-500"><LockKeyhole size={14} aria-hidden="true" />Sensible</span>}
                 </div>
+                <div id={`variable-details-${index}`} hidden={!showDetails}>
                 {snapshotReady && <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                   <span title={draft.existing ? 'Ya existe en el workspace seleccionado' : 'Declarada en el archivo, pero no existe en el workspace seleccionado'} className={`text-xs font-semibold ${draft.existing ? 'text-emerald-800' : 'text-amber-800'}`}>{draft.existing ? 'En workspace' : 'Solo en archivo'}</span>
                   {draft.existing && <label className="flex items-center gap-2 text-sm" htmlFor={`operation-${index}`}><span>Accion</span><select id={`operation-${index}`} aria-label={`Accion para ${draft.originalKey}`} value={draft.operation} disabled={busy !== null || draft.locked || !workspace?.canWrite} onChange={(event) => { const operation = event.target.value === 'delete' ? 'delete' : event.target.value === 'update' ? 'update' : 'keep'; edit(index, { operation, included: operation !== 'keep' }); }} className="h-10 rounded-md border border-neutral-300 bg-white px-3 disabled:opacity-50"><option value="keep">Conservar</option><option value="update">Actualizar</option><option value="delete">Eliminar</option></select></label>}
@@ -296,10 +329,11 @@ export default function VariableEditor({ variables, filename, onSubmitting, dest
                   <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.hcl} disabled={draft.category === 'env'} onChange={(event) => edit(index, { hcl: event.target.checked })} className="size-4 accent-brand" />Evaluar como HCL</label>
                   <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.sensitive} onChange={(event) => edit(index, { sensitive: event.target.checked })} className="size-4 accent-brand" />Sensible</label>
                 </fieldset>
+                </div>
                 {outcome && <p className="mt-4 text-sm text-neutral-600">{outcome.message}</p>}
               </section>;
             })}
-            {search && !drafts.some((draft) => draft.key.toLowerCase().includes(search.toLowerCase())) && <p className="py-12 text-center text-sm text-neutral-500">Sin coincidencias</p>}
+            {!tabDrafts.some(matches) && <p className="py-12 text-center text-sm text-neutral-500">{search ? 'Sin coincidencias' : 'No hay variables en esta pestana'}</p>}
           </div>
 
           <aside className="min-w-0 self-start border-t border-neutral-200 pt-6 xl:sticky xl:top-6 xl:border-t-0 xl:border-l xl:pt-0 xl:pl-6" aria-labelledby="destination-title">
