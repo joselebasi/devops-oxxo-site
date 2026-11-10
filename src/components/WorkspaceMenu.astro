@@ -1,0 +1,60 @@
+---
+import { ArrowUpRight, ClipboardList, SlidersHorizontal } from 'lucide-react';
+---
+
+<section aria-labelledby="workspace-title" class="workspace-menu mx-auto w-full max-w-4xl py-6 sm:py-14">
+  <div class="mb-9 border-b border-neutral-200 pb-7 sm:mb-12">
+    <p class="mb-3 text-xs font-bold uppercase tracking-widest text-brand">DevOps OXXO</p>
+    <h1 id="workspace-title" class="text-3xl font-bold text-ink sm:text-4xl">Espacio de trabajo</h1>
+  </div>
+  <nav aria-label="Herramientas" class="grid min-w-0 gap-5 sm:grid-cols-2">
+    <a href="/?vista=variables" class="workspace-option group relative flex min-h-56 min-w-0 flex-col justify-between rounded-lg border border-neutral-200 border-t-4 border-t-brand bg-white p-6 shadow-sm hover:border-brand hover:shadow-md sm:min-h-64 sm:p-8">
+      <div class="flex items-start justify-between gap-4">
+        <span class="inline-flex size-14 items-center justify-center rounded-lg bg-red-50 text-brand">
+          <SlidersHorizontal size={28} aria-hidden="true" />
+        </span>
+        <ArrowUpRight size={22} className="text-neutral-500 group-hover:text-brand" aria-hidden="true" />
+      </div>
+      <div class="mt-8">
+        <p class="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-500">Infraestructura</p>
+        <h2 class="text-2xl font-bold text-ink">Variables</h2>
+      </div>
+    </a>
+    <a href="/?vista=checklist" class="workspace-option group relative flex min-h-56 min-w-0 flex-col justify-between rounded-lg border border-neutral-200 border-t-4 border-t-emerald-700 bg-white p-6 shadow-sm hover:border-emerald-700 hover:shadow-md sm:min-h-64 sm:p-8">
+      <div class="flex items-start justify-between gap-4">
+        <span class="inline-flex size-14 items-center justify-center rounded-lg bg-emerald-50 text-emerald-800">
+          <ClipboardList size={28} aria-hidden="true" />
+        </span>
+        <ArrowUpRight size={22} className="text-neutral-500 group-hover:text-emerald-800" aria-hidden="true" />
+      </div>
+      <div class="mt-8">
+        <p class="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-500">Operaciones</p>
+        <h2 class="text-2xl font-bold leading-tight text-ink">Checklist de actividades</h2>
+      </div>
+    </a>
+  </nav>
+</section>
+
+<style>
+  .workspace-menu {
+    background-image: radial-gradient(var(--workspace-dot) 0.65px, transparent 0.65px);
+    background-size: 18px 18px;
+    background-position: center;
+  }
+
+  .workspace-option {
+    transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .workspace-option:hover {
+      transform: translateY(-3px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .workspace-option {
+      transition: none;
+    }
+  }
+</style>

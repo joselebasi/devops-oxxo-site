@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import { Image } from 'astro:assets';
+import { Moon, Sun } from 'lucide-react';
 import engineeringLogo from '../assets/logo-ingenieria-staff.png';
 import { OrganizationSwitcher, Show, SignInButton, SignUpButton, UserButton } from '@clerk/astro/components';
 
@@ -13,10 +14,26 @@ const {
   title,
   description = 'Proyecto DevOps OXXO.',
 } = Astro.props;
+const requestedTheme = Astro.url.searchParams.get('tema');
+const theme = requestedTheme === 'dark' || requestedTheme === 'light'
+  ? requestedTheme
+  : Astro.cookies.get('theme')?.value === 'dark' ? 'dark' : 'light';
+if (requestedTheme === 'dark' || requestedTheme === 'light') {
+  Astro.cookies.set('theme', theme, {
+    path: '/', sameSite: 'lax', httpOnly: true,
+    secure: Astro.url.protocol === 'https:', maxAge: 60 * 60 * 24 * 365,
+  });
+}
+
+function themeUrl(selectedTheme: 'light' | 'dark') {
+  const query = new URLSearchParams(Astro.url.searchParams);
+  query.set('tema', selectedTheme);
+  return `${Astro.url.pathname}?${query}`;
+}
 ---
 
 <!doctype html>
-<html lang="es">
+<html lang="es" data-theme={theme}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
@@ -53,6 +70,16 @@ const {
         />
       </a>
       <div class="flex flex-wrap items-center gap-5">
+        <nav aria-label="Apariencia" class="flex shrink-0 gap-1 rounded-md border border-neutral-300 bg-white p-1">
+          <a href={themeUrl('light')} aria-label="Modo claro" title="Modo claro" aria-current={theme === 'light' ? 'true' : undefined}
+            class:list={['inline-flex size-11 items-center justify-center rounded', theme === 'light' ? 'bg-emerald-50 text-emerald-800' : 'text-neutral-600 hover:bg-neutral-100']}>
+            <Sun size={19} aria-hidden="true" />
+          </a>
+          <a href={themeUrl('dark')} aria-label="Modo oscuro" title="Modo oscuro" aria-current={theme === 'dark' ? 'true' : undefined}
+            class:list={['inline-flex size-11 items-center justify-center rounded', theme === 'dark' ? 'bg-emerald-50 text-emerald-800' : 'text-neutral-600 hover:bg-neutral-100']}>
+            <Moon size={19} aria-hidden="true" />
+          </a>
+        </nav>
         {import.meta.env.DEV && <span class="inline-flex items-center gap-2 text-sm text-neutral-600">
           <span class="size-2 rounded-full bg-emerald-700" aria-hidden="true"></span>
           Entorno local

@@ -7,11 +7,38 @@
 }
 
 @layer base {
+  :root {
+    color-scheme: light;
+    --surface: #ffffff;
+    --canvas: #f5f6f5;
+    --page-background: #fafafa;
+    --text: #242424;
+    --muted: #595959;
+    --line: #d7dcd9;
+    --active: #e8f4ef;
+    --active-text: #126148;
+    --workspace-dot: #d4d4d4;
+  }
+
+  html[data-theme='dark'] {
+    color-scheme: dark;
+    --surface: #252a28;
+    --canvas: #191d1b;
+    --page-background: #151917;
+    --text: #f4f6f5;
+    --color-ink: #f4f6f5;
+    --muted: #b6c1ba;
+    --line: #49534d;
+    --active: #214a39;
+    --active-text: #a4f0c4;
+    --workspace-dot: #39433d;
+  }
+
   body {
     margin: 0;
     min-width: 320px;
     color: var(--color-ink);
-    background-color: #fafafa;
+    background-color: var(--page-background);
   }
 
   button {
@@ -19,7 +46,32 @@
   }
 
   :focus-visible {
-    outline: 3px solid #087f6d;
+    outline: 3px solid var(--active-text);
     outline-offset: 4px;
+  }
+}
+
+@layer utilities {
+  html[data-theme='dark'] {
+    .bg-white { background-color: var(--surface); }
+    .bg-neutral-50, .bg-neutral-100 { background-color: var(--canvas); }
+    .text-neutral-500, .text-neutral-600, .text-neutral-700 { color: var(--muted); }
+    .text-neutral-800, .text-neutral-900 { color: var(--text); }
+    .text-brand { color: #ff9aab; }
+    .border-neutral-200, .border-neutral-300, .border-neutral-400,
+    .border-b-neutral-300 { border-color: var(--line); }
+    .border-t-brand { border-top-color: var(--color-brand); }
+    .border-t-emerald-700 { border-top-color: #047857; }
+    .hover\:border-brand:hover { border-color: var(--color-brand); }
+    .hover\:border-emerald-700:hover { border-color: #047857; }
+    .bg-red-50 { background-color: #42272c; }
+    .text-red-800, .text-red-900 { color: #ffb8bf; }
+    .bg-amber-50 { background-color: #3b321c; }
+    .text-amber-800, .text-amber-950 { color: #f8d88c; }
+    .bg-emerald-50 { background-color: var(--active); }
+    .text-emerald-700, .text-emerald-800 { color: var(--active-text); }
+    .hover\:bg-neutral-100:hover { background-color: #343c37; }
+    .disabled\:bg-neutral-100:disabled { background-color: var(--canvas); }
+    .disabled\:text-neutral-500:disabled { color: var(--muted); }
   }
 }

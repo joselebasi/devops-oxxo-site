@@ -1,0 +1,186 @@
+---
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+import { ArrowUpRight, Check, Clock3, Download } from 'lucide-react';
+import GitHubActions from '../assets/github-actions.svg';
+import gitopsLogo from '../assets/gitops-logo.png';
+import argocdLogo from '../assets/argocd.png';
+import openshiftLogo from '../assets/openshift.png';
+import terraformLight from '../assets/Terraform-LogoMark_onLight.png';
+import terraformDark from '../assets/Terraform-LogoMark_onDark.png';
+import { environments, formatDuration, getChecklist, getEnvironment, getTechnology, technologies } from '../lib/checklists';
+
+const technology = getTechnology(Astro.url.searchParams.get('tecnologia'));
+const environment = getEnvironment(Astro.url.searchParams.get('ambiente'));
+const tasks = technology ? getChecklist(technology.id, environment.id) : [];
+const total = tasks.reduce((minutes, task) => minutes + task.minutes, 0);
+
+interface Tool {
+  name: string;
+  category: string;
+  light: string;
+  dark: string;
+  contrastSurface: boolean;
+  href?: string;
+  image?: ImageMetadata;
+}
+
+const githubTools: Tool[] = [
+  { name: 'Conjur', category: 'Gestion de secretos', light: '/Conjur_4C_KO.svg', dark: '/Conjur_4C_KO.svg', contrastSurface: true },
+  { name: 'Checkmarx', category: 'Seguridad de aplicaciones', light: '/checkmarx-logo-core-midnight.svg', dark: '/checkmarx-logo-cloud-white.svg', contrastSurface: false, href: 'https://ast.checkmarx.net/projects/7e3c7d7b-783a-4a9b-9592-c56fc3ff7136/scans?id=14700893-e9cf-4780-8caf-e77ce64d450c&branch=wip-I23069-CHG-dev2' },
+  { name: 'SonarQube Cloud', category: 'Calidad de codigo', light: '/sonarqube-cloud-light.svg', dark: '/sonarqube-cloud-dark.svg', contrastSurface: false, href: 'https://sonarqube.us/login?return_to=%2Flogin' },
+  { name: 'GitHub', category: 'Repositorios y automatizacion', light: '/GitHub_Lockup_Black.svg', dark: '/GitHub_Lockup_White.svg', contrastSurface: false, href: 'https://github.com/enterprises/oxxogh' },
+];
+
+const terraformTools: Tool[] = [
+  { name: 'HCP Terraform', category: 'Infraestructura como codigo', light: '/HCP-Terraform_onLight.svg', dark: '/HCP-Terraform_onDark.svg', contrastSurface: false, href: 'https://app.terraform.io/login/sso' },
+  { name: 'Tenable', category: 'Gestion de vulnerabilidades', light: '/tenable-light.svg', dark: '/tenable-dark.svg', contrastSurface: false },
+];
+const openshiftTools: Tool[] = [
+  { name: 'GitOps', category: 'Entrega declarativa', light: '/gitops-logo.png', dark: '/gitops-logo.png', contrastSurface: false, image: gitopsLogo },
+  { name: 'Argo CD', category: 'Despliegue continuo', light: '/argocd.png', dark: '/argocd.png', contrastSurface: false, image: argocdLogo },
+];
+const toolsByTechnology = { 'github-actions': githubTools, terraform: terraformTools, openshift: openshiftTools };
+const tools = technology ? toolsByTechnology[technology.id] : [];
+
+function checklistUrl(technologyId = technology?.id ?? '', environmentId = environment.id) {
+  const query = new URLSearchParams({ vista: 'checklist' });
+  const theme = Astro.url.searchParams.get('tema');
+  if (theme === 'dark' || theme === 'light') query.set('tema', theme);
+  if (technologyId) query.set('tecnologia', technologyId);
+  if (technologyId) query.set('ambiente', environmentId);
+  return `/?${query}`;
+}
+---
+
+<section class="checklist" aria-labelledby="checklist-title">
+  <div class="flex flex-wrap items-start justify-between gap-5">
+    <div>
+      <p class="eyebrow mb-2 text-xs font-bold uppercase">Operaciones / Checklist</p>
+      <h1 id="checklist-title" class="text-2xl font-bold sm:text-3xl">Checklist de actividades</h1>
+    </div>
+  </div>
+
+  <nav aria-label="Tecnologias" class="mt-8 grid min-w-0 gap-4 md:grid-cols-3">
+    {technologies.map((item) => (
+      <a href={checklistUrl(item.id)} aria-current={technology?.id === item.id ? 'page' : undefined} class="technology-option flex min-h-40 min-w-0 flex-col justify-between rounded-lg border p-5" style={`--accent: ${item.accent}`}>
+        <div class="flex items-start justify-between gap-3">
+          <span class="flex h-16 w-24 items-center justify-start" aria-hidden="true">
+            {item.id === 'github-actions' && <GitHubActions width={56} height={56} class="github-logo h-14 w-14" aria-hidden="true" />}
+            {item.id === 'terraform' && <>
+              <Image src={terraformLight} alt="" width={56} height={64} widths={[56, 112]} sizes="56px" format="webp" class="terraform-light h-16 w-14 object-contain" loading="eager" />
+              <Image src={terraformDark} alt="" width={56} height={64} widths={[56, 112]} sizes="56px" format="webp" class="terraform-dark h-16 w-14 object-contain" loading="eager" />
+            </>}
+            {item.id === 'openshift' && <Image src={openshiftLogo} alt="" width={96} widths={[96, 192]} sizes="96px" format="webp" class="h-16 w-24 object-contain" loading="eager" />}
+          </span>
+          {technology?.id === item.id ? <Check size={20} className="selection-mark" aria-hidden="true" /> : <ArrowUpRight size={20} className="muted" aria-hidden="true" />}
+        </div>
+        <div class="mt-5">
+          <h2 class="text-lg font-bold">{item.name}</h2>
+          <p class="muted mt-1 text-xs">{item.category}</p>
+        </div>
+      </a>
+    ))}
+  </nav>
+
+  {technology && <div class="mt-10 min-w-0">
+    <div class="section-divider flex flex-wrap items-center justify-between gap-5 border-b pb-6">
+      <div>
+        <div class="flex flex-wrap items-center gap-3">
+          <h2 class="text-xl font-bold">{technology.name}</h2>
+          <span class="template-badge rounded border px-2 py-1 text-xs font-semibold">Plantilla base</span>
+        </div>
+        <p class="muted mt-2 text-sm">Roles y tiempos orientativos, sujetos a validacion del equipo.</p>
+      </div>
+      <a href={`/api/checklist.xlsx?tecnologia=${technology.id}`} download class="download-button inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-bold">
+        <Download size={18} aria-hidden="true" />Descargar Excel
+      </a>
+    </div>
+
+    {tools.length > 0 && <section aria-labelledby="technology-tools-title" class="section-divider border-b py-6">
+      <h3 id="technology-tools-title" class="muted text-xs font-bold uppercase tracking-widest">Herramientas principales</h3>
+      <ul class="tools-grid mt-4">
+        {tools.map((tool) => {
+          const LogoContainer = tool.href ? 'a' : 'div';
+          return <li class="min-w-0 px-3 py-3">
+          <figure>
+            <LogoContainer href={tool.href} target={tool.href ? '_blank' : undefined} rel={tool.href ? 'noopener noreferrer' : undefined}
+              aria-label={tool.href ? `Abrir ${tool.name} (nueva pestana)` : undefined} title={tool.href ? `Abrir ${tool.name} (nueva pestana)` : undefined}
+              class:list={['flex h-16 items-center justify-center rounded px-3', { 'tool-contrast-surface': tool.contrastSurface }]}>
+              {tool.image ? <Image src={tool.image} alt={tool.name} width={180} widths={[180, 360]} sizes="(max-width: 319px) 100vw, 192px" format="webp" class="h-12 w-full max-w-48 object-contain" loading="lazy" decoding="async" /> : <>
+                <img src={tool.light} alt={tool.name} width={180} height={48} class="tool-logo-light h-12 w-full max-w-48 object-contain" loading="lazy" decoding="async" />
+                <img src={tool.dark} alt={tool.name} width={180} height={48} class="tool-logo-dark h-12 w-full max-w-48 object-contain" loading="lazy" decoding="async" />
+              </>}
+            </LogoContainer>
+            <figcaption class="muted mt-3 text-center text-xs leading-5">{tool.category}</figcaption>
+          </figure>
+        </li>;
+        })}
+      </ul>
+    </section>}
+
+    <div class="my-6 flex flex-wrap items-center justify-between gap-5">
+      <nav aria-label="Ambiente" class="environment-tabs inline-flex gap-1 rounded-md border p-1">
+        {environments.map((item) => <a href={checklistUrl(technology.id, item.id)} aria-current={environment.id === item.id ? 'page' : undefined} class="inline-flex min-h-11 min-w-16 items-center justify-center rounded px-4 text-sm font-bold">{item.name}</a>)}
+      </nav>
+      <div class="muted flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+        <span>{tasks.length} actividades</span>
+        <span class="inline-flex items-center gap-2"><Clock3 size={16} aria-hidden="true" />{formatDuration(total)} estimadas</span>
+      </div>
+    </div>
+
+    <div class="table-region min-w-0 overflow-x-auto rounded-md border" role="region" aria-label={`Actividades de ${technology.name} para ${environment.name}`} tabindex="0">
+      <table class="w-full min-w-[760px] border-collapse text-left text-sm">
+        <caption class="sr-only">{technology.name}: actividades de {environment.label}. Tiempos estimados, no incluyen esperas de aprobacion.</caption>
+        <thead>
+          <tr>
+            <th scope="col" class="w-[40%] px-5 py-4 font-semibold">Tarea</th>
+            <th scope="col" class="w-[18%] px-5 py-4 font-semibold">Responsable</th>
+            <th scope="col" class="w-[27%] px-5 py-4 font-semibold">A quien se solicita</th>
+            <th scope="col" class="w-[15%] px-5 py-4 text-right font-semibold">Tiempo estimado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tasks.map((task, index) => <tr>
+            <th scope="row" class="px-5 py-5 font-medium leading-6"><span class="muted mr-3 inline-block min-w-5 text-xs tabular-nums">{String(index + 1).padStart(2, '0')}</span>{task.task}</th>
+            <td class="muted px-5 py-5 leading-6">{task.owner}</td>
+            <td class="muted px-5 py-5 leading-6">{task.requestedFrom}</td>
+            <td class="whitespace-nowrap px-5 py-5 text-right font-semibold tabular-nums">{formatDuration(task.minutes)}</td>
+          </tr>)}
+        </tbody>
+        <tfoot><tr><th scope="row" colspan="3" class="px-5 py-4 font-semibold">Tiempo total estimado · {environment.name}</th><td class="whitespace-nowrap px-5 py-4 text-right font-bold tabular-nums">{formatDuration(total)}</td></tr></tfoot>
+      </table>
+    </div>
+    <p class="muted mt-4 text-xs leading-5">Estimaciones de ejecucion; no incluyen tiempos de espera, aprobaciones ni incidencias.</p>
+  </div>}
+</section>
+
+<style>
+  .checklist { padding: 1.5rem; border-radius: 8px; background: var(--canvas); color: var(--text); }
+  .muted, .eyebrow { color: var(--muted); }
+  .environment-tabs, .technology-option, .table-region, .section-divider, .template-badge { border-color: var(--line); }
+  .technology-option, .environment-tabs, .table-region { background: var(--surface); }
+  .technology-option { border-top: 3px solid var(--accent); transition: border-color 150ms ease, box-shadow 150ms ease; }
+  .technology-option:hover, .technology-option[aria-current='page'] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .selection-mark { color: var(--active-text); }
+  .environment-tabs a:hover { background: var(--canvas); }
+  .environment-tabs a[aria-current] { background: var(--active); color: var(--active-text); }
+  .download-button { background: #126148; color: #fff; }
+  .download-button:hover { background: #0c4b37; }
+  .template-badge { color: var(--muted); }
+  .tools-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 1rem; }
+  .tool-contrast-surface { background: #252a28; }
+  :global(html[data-theme='dark']) .tool-contrast-surface { background: transparent; }
+  .tool-logo-dark { display: none; }
+  :global(html[data-theme='dark']) .tool-logo-light { display: none; }
+  :global(html[data-theme='dark']) .tool-logo-dark { display: block; }
+  thead, tfoot { background: var(--canvas); }
+  tbody tr, tfoot tr { border-top: 1px solid var(--line); }
+  tbody tr:hover { background: var(--canvas); }
+  .terraform-dark { display: none; }
+  :global(html[data-theme='dark']) .terraform-light { display: none; }
+  :global(html[data-theme='dark']) .terraform-dark { display: block; }
+  :global(html[data-theme='dark'] .github-logo) { filter: brightness(1.2); }
+  @media (max-width: 639px) { .checklist { padding: 1rem; } }
+  @media (prefers-reduced-motion: reduce) { .technology-option { transition: none; } }
+</style>

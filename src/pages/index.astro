@@ -1,6 +1,9 @@
 ---
 import { getSecret } from 'astro:env/server';
+import { ArrowLeft, ClipboardList, SlidersHorizontal } from 'lucide-react';
+import ActivityChecklist from '../components/ActivityChecklist.astro';
 import InfrastructureExplorer from '../components/InfrastructureExplorer';
+import WorkspaceMenu from '../components/WorkspaceMenu.astro';
 import Layout from '../layouts/Layout.astro';
 import { hasInfrastructureAccess } from '../lib/organization-access';
 
@@ -8,12 +11,39 @@ const auth = Astro.locals.auth();
 if (!auth.userId) return Astro.redirect('/sign-in');
 
 const authorized = hasInfrastructureAccess(auth);
-const enterprise = authorized ? getSecret('GITHUB_ENTERPRISE')?.trim() || 'oxxogh' : '';
+const requestedView = Astro.url.searchParams.get('vista');
+const view = requestedView === 'variables' || requestedView === 'checklist' ? requestedView : 'menu';
+const enterprise = authorized && view === 'variables' ? getSecret('GITHUB_ENTERPRISE')?.trim() || 'oxxogh' : '';
+const title = view === 'variables' ? 'Variables IaC' : view === 'checklist' ? 'Checklist de actividades' : 'Espacio de trabajo';
 ---
 
-<Layout title="Variables IaC | DevOps OXXO" description="Consulta local de variables de infraestructura del enterprise oxxogh.">
+<Layout title={`${title} | DevOps OXXO`} description="Espacio de trabajo de Infraestructura y DevOps OXXO.">
     <main class="mx-auto w-full min-w-0 max-w-7xl px-5 py-9 sm:px-10">
-      {authorized ? <InfrastructureExplorer client:load enterprise={enterprise} /> : (
+      {authorized ? (
+        view === 'menu' ? <WorkspaceMenu /> : (
+          <>
+            <div class="mb-8 flex min-w-0 flex-wrap items-center justify-between gap-5 border-b border-neutral-200 pb-5">
+              <a href="/" class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-neutral-600 hover:text-brand">
+                <ArrowLeft size={18} aria-hidden="true" />
+                Inicio
+              </a>
+              <nav aria-label="Herramientas" class="flex min-w-0 flex-wrap gap-2">
+                <a href="/?vista=variables" aria-current={view === 'variables' ? 'page' : undefined}
+                  class:list={['inline-flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold', view === 'variables' ? 'bg-red-50 text-brand' : 'text-neutral-600 hover:bg-neutral-100']}>
+                  <SlidersHorizontal size={18} className="shrink-0" aria-hidden="true" />Variables
+                </a>
+                <a href="/?vista=checklist" aria-current={view === 'checklist' ? 'page' : undefined}
+                  class:list={['inline-flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold', view === 'checklist' ? 'bg-emerald-50 text-emerald-800' : 'text-neutral-600 hover:bg-neutral-100']}>
+                  <ClipboardList size={18} className="shrink-0" aria-hidden="true" />Checklist de actividades
+                </a>
+              </nav>
+            </div>
+            {view === 'variables' ? <InfrastructureExplorer client:load enterprise={enterprise} /> : (
+              <ActivityChecklist />
+            )}
+          </>
+        )
+      ) : (
         <div role="status" class="border-l-4 border-amber-600 bg-amber-50 px-5 py-6 text-amber-950">
           <h1 class="text-xl font-semibold">Asignacion de organizacion pendiente</h1>
           <p class="mt-3 text-sm leading-6">Contacta al administrador para la asignacion de tu organizacion.</p>
