@@ -102,12 +102,13 @@ function checklistUrl(technologyId = technology?.id ?? '', environmentId = envir
       <ul class="tools-grid mt-4">
         {tools.map((tool) => {
           const LogoContainer = tool.href ? 'a' : 'div';
+          const isArgo = tool.name === 'Argo CD';
           return <li class="min-w-0 px-3 py-3">
           <figure>
             <LogoContainer href={tool.href} target={tool.href ? '_blank' : undefined} rel={tool.href ? 'noopener noreferrer' : undefined}
               aria-label={tool.href ? `Abrir ${tool.name} (nueva pestana)` : undefined} title={tool.href ? `Abrir ${tool.name} (nueva pestana)` : undefined}
               class:list={['flex h-16 items-center justify-center rounded px-3', { 'tool-contrast-surface': tool.contrastSurface }]}>
-              {tool.image ? <Image src={tool.image} alt={tool.name} width={180} widths={[180, 360]} sizes="(max-width: 319px) 100vw, 192px" format="webp" class="h-12 w-full max-w-48 object-contain" loading="lazy" decoding="async" /> : <>
+              {tool.image ? <Image src={tool.image} alt={tool.name} width={isArgo ? 270 : 180} widths={isArgo ? [270, 540] : [180, 360]} sizes={isArgo ? '(max-width: 319px) 100vw, 288px' : '(max-width: 319px) 100vw, 192px'} format="webp" class:list={['w-full object-contain', isArgo ? 'h-18 max-w-72' : 'h-12 max-w-48']} loading="lazy" decoding="async" /> : <>
                 <img src={tool.light} alt={tool.name} width={180} height={48} class="tool-logo-light h-12 w-full max-w-48 object-contain" loading="lazy" decoding="async" />
                 <img src={tool.dark} alt={tool.name} width={180} height={48} class="tool-logo-dark h-12 w-full max-w-48 object-contain" loading="lazy" decoding="async" />
               </>}
